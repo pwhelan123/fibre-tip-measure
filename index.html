@@ -264,6 +264,7 @@ function show(i){
  $('label').value=c.label||''; $('ap').value=(c.ap??'');
  $('umpx').value=c.um||'';
  el.im.onload=()=>render();
+ el.im.onerror=()=>{note('Could not display '+c.name+'. Browsers do not render TIFF — measure on a PNG or JPEG export and use the TIFF only for the scale.',true);};
  if(el.im.complete) render();
  renderList();
 }
@@ -416,22 +417,45 @@ $('bDel').onclick=()=>{if(S.cur<0)return;S.imgs.splice(S.cur,1);S.cur=Math.min(S
  if(!S.imgs.length){el.frame.hidden=true;$('empty').hidden=false;$('out').value='';}else show(S.cur);renderList();save();};
 // ---- files ----
 function addFiles(files){
- const jobs=[...files].filter(f=>f.type.startsWith('image/')).map(f=>new Promise(res=>{
+ const all=[...files];
+ const tiffs=all.filter(isTiff);
+ const pics=all.filter(f=>f.type.startsWith('image/')&&!isTiff(f));
+ if(tiffs.length&&!pics.length&&!S.imgs.length){
+  note('Browsers cannot display TIFF images. Drop the PNG or JPEG export you want to measure on, then drop the TIFF again and its scale will be read from the metadata.',true);
+  return;}
+ const jobs=pics.map(f=>new Promise(res=>{
   const r=new FileReader(); r.onload=()=>res({name:f.name,label:f.name.replace(/\.[^.]+$/,''),src:r.result,um:null,ap:null}); r.readAsDataURL(f);}));
- Promise.all(jobs).then(list=>{if(!list.length)return; S.imgs=S.imgs.concat(list); show(S.imgs.length-list.length); renderList(); save();});
+ Promise.all(jobs).then(list=>{
+  if(list.length){S.imgs=S.imgs.concat(list); show(S.imgs.length-list.length); renderList(); save();}
+  if(tiffs.length){
+   note(tiffs.length===1?'Reading scale from '+tiffs[0].name+'…':'Reading scale from '+tiffs.length+' TIFFs…');
+   setTimeout(()=>tiffs.forEach(applyTiff),200);}
+ });
 }
-$('bTiff').onclick=()=>{if(!cur()){alert('Add the image you are measuring first, then read its TIFF.');return;}$('tiffFile').click();};
-$('tiffFile').onchange=e=>{const f=e.target.files[0]; if(!f)return; const c=cur(); const r=new FileReader();
+const isTiff=f=>/\.tiff?$/i.test(f.name)||f.type==='image/tiff';
+function note(html,warn){$('tiffHint').innerHTML=warn?('<b style="color:var(--warn)">'+html+'</b>'):html;}
+// Browsers cannot display TIFFs, so a TIFF is only ever used for its pixel size:
+// it is matched to an already-loaded export (same file name if possible) and the
+// scale is adjusted by the ratio of their pixel widths.
+function applyTiff(f){
+ const base=f.name.replace(/\.[^.]+$/,'').toLowerCase();
+ let i=S.imgs.findIndex(c=>c.name.replace(/\.[^.]+$/,'').toLowerCase()===base);
+ if(i<0) i=S.cur;
+ if(i<0){note('Add the PNG or JPEG export you want to measure on first, then read its TIFF for the scale.',true);return;}
+ if(i!==S.cur) show(i);
+ const c=S.imgs[i], r=new FileReader();
  r.onload=()=>{const t=tiffScale(r.result);
-  if(t.err){$('tiffHint').innerHTML='<b style="color:var(--warn)">'+t.err+'</b>'+(t.w?(' — TIFF is '+t.w+'×'+t.h+' px'):'');return;}
+  if(t.err){note(t.err+(t.w?(' — TIFF is '+t.w+'×'+t.h+' px'):''),true);return;}
   const shown=el.im.naturalWidth, ratio=t.w?t.w/shown:1;
   c.um=+(t.um*ratio).toPrecision(6); c.tiffUm=t.um; c.tiffW=t.w; $('umpx').value=c.um;
   const same=Math.abs(ratio-1)<0.001;
-  $('tiffHint').innerHTML=`${t.um} µm/px from ${t.src}.` + (same
-    ? ' Image is full resolution, so that is the scale used.'
-    : ` TIFF is ${t.w} px wide, this image is ${shown} px — scaled by ${ratio.toFixed(3)}× to <b>${c.um} µm/px</b>.`);
+  note(`<b>${c.um} µm/px</b> for <b>${c.label||c.name}</b> — ${t.um} µm/px from ${t.src}` + (same
+    ? ', image is full resolution.'
+    : `, TIFF ${t.w} px wide vs this image ${shown} px (×${ratio.toFixed(3)}).`));
   render(); save();};
- r.readAsArrayBuffer(f); e.target.value='';};
+ r.readAsArrayBuffer(f);}
+$('bTiff').onclick=()=>{if(!S.imgs.length){note('Add the PNG or JPEG export you want to measure on first.',true);return;}$('tiffFile').click();};
+$('tiffFile').onchange=e=>{const f=e.target.files[0]; if(f)applyTiff(f); e.target.value='';};
 $('pick').onclick=()=>$('file').click();
 $('file').onchange=e=>addFiles(e.target.files);
 const dz=$('drop');
