@@ -5,8 +5,16 @@ images are read in the browser and stay on that computer.
 
 ## Use
 1. Drop section images in (or "Choose files…"). Any image your browser opens: TIFF exports, PNG, JPEG, screenshots.
-2. Set the scale for each image: type **µm per pixel**, or click **Calibrate by clicking 2 points**, type the known
-   length in µm, and click the two ends of it (a scale bar, or a structure you have measured).
+2. Set the scale for each image, easiest first:
+   - **Read scale from TIFF…** — pick the original TIFF and the scale is read from its metadata. Browsers cannot
+     display TIFFs, so you still measure on a PNG/JPEG export; the tool compares the TIFF's pixel width with the
+     export's and scales accordingly, which is exactly the trap that makes a 1 mm bar look short. Reads
+     OME-XML `PhysicalSizeX`, ImageJ headers, and plain `XResolution` in cm or inch. Tested against Leica,
+     ImageJ and OME files; BigTIFF is not supported and says so.
+   - **µm per pixel** typed in, if you know it.
+   - **Calibrate by clicking 2 points**, then type the known length in µm (a scale bar, or a structure you
+     have measured).
+   The TIFF value and its pixel width are recorded in the results (`tiff_um_per_px`, `tiff_width_px`).
 3. Place the marks: **1 fibre tip**, **2 dorsal**, **3 ventral**, and optionally **4 bolus** (the centre of the injection bolus, ventral of the tip). Put the dorsal and ventral marks on the midline —
    at the brain surface if you want depth from the surface.
 4. Optionally type the animal ID and the AP level (mm from bregma) you matched the section to.
