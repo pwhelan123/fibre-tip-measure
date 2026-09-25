@@ -32,10 +32,11 @@ h1{font-size:16px;margin:0}.sub{color:var(--muted);font-size:12px;margin:2px 0 0
 .thumb .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--rule);flex:none}
 .dot.on{background:var(--ok)}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
 .seg button{font-family:var(--sans);font-size:12px;font-weight:600;border:1.5px solid var(--rule);background:var(--panel2);color:var(--muted);border-radius:5px;padding:7px 4px;cursor:pointer}
 #bTip[aria-pressed="true"]{background:var(--tip);border-color:var(--tip);color:var(--ground)}
 #bDor[aria-pressed="true"],#bVen[aria-pressed="true"]{background:var(--axis);border-color:var(--axis);color:var(--ground)}
+#bBol[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:var(--ground)}
 .card{background:var(--panel2);border:1px solid var(--rule);border-radius:6px;padding:9px 11px;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .card .row{display:flex;justify-content:space-between;gap:8px;padding:3.5px 0;font-size:12.5px}
 .card .row+.row{border-top:1px solid var(--rule)}
@@ -56,8 +57,11 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
 .empty{max-width:520px;color:var(--muted);font-size:13px;line-height:1.6}
 .empty h2{color:var(--ink);font-size:15px;margin:0 0 6px}
 .empty ol{padding-left:18px;margin:8px 0}
-.scalebar{position:absolute;right:10px;bottom:10px;height:3px;background:#fff}
-.scalebar span{position:absolute;right:0;bottom:6px;font:11px var(--mono);color:#fff;white-space:nowrap}
+.scalebar{position:absolute;right:12px;bottom:14px;height:4px;background:#fff;box-shadow:0 0 0 1px #0008}
+.scalebar::before,.scalebar::after{content:"";position:absolute;top:-4px;width:2px;height:12px;background:#fff;box-shadow:0 0 0 1px #0008}
+.scalebar::before{left:0}.scalebar::after{right:0}
+.scalebar span{position:absolute;right:0;bottom:9px;font:11.5px var(--mono);color:#fff;white-space:nowrap;text-shadow:0 1px 3px #000}
+.scalebar em{position:absolute;right:0;top:9px;font:10.5px var(--mono);font-style:normal;color:#cfd3dd;white-space:nowrap;text-shadow:0 1px 3px #000}
 </style></head><body>
 <div class="wrap">
  <div class="side">
@@ -82,7 +86,7 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
   </div>
   <div class="frame" id="frame" hidden>
    <div class="rot" id="rot"><img id="im" alt="section"><svg id="ov"></svg></div>
-   <div class="scalebar" id="sbar"><span id="sbarTxt">1 mm</span></div>
+   <div class="scalebar" id="sbar"><span id="sbarTxt">1 mm</span><em id="sbarUm">—</em></div>
   </div>
   <div class="atlasPane" id="atlasPane" hidden>
    <img id="apIm" alt="Allen atlas coronal plate">
@@ -113,8 +117,9 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
   <div><p class="eyebrow">Placing</p><div class="seg">
    <button id="bTip" aria-pressed="true">1 · Tip</button>
    <button id="bDor" aria-pressed="false">2 · Dorsal</button>
-   <button id="bVen" aria-pressed="false">3 · Ventral</button></div>
-   <p class="hint" style="margin-top:6px">Put the dorsal and ventral marks on the midline — at the brain surface if you want depth from the surface. If the section is upside down, <b>Flip 180°</b> first so dorsal is at the top; the panel warns if the dorsal mark ends up below the ventral one.</p></div>
+   <button id="bVen" aria-pressed="false">3 · Ventral</button>
+   <button id="bBol" aria-pressed="false">4 · Bolus</button></div>
+   <p class="hint" style="margin-top:6px">Mark 4 is optional: click the centre of the injection bolus, ventral of the tip. Put the dorsal and ventral marks on the midline — at the brain surface if you want depth from the surface. If the section is upside down, <b>Flip 180°</b> first so dorsal is at the top; the panel warns if the dorsal mark ends up below the ventral one.</p></div>
 
   <canvas class="mag" id="mag" width="280" height="280"></canvas>
 
@@ -124,6 +129,9 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
    <div class="row"><span class="k">above ventral mark</span><span class="v na" id="vAV">—</span></div>
    <div class="row"><span class="k">dorsal–ventral span</span><span class="v na" id="vSpan">—</span></div>
    <div class="row"><span class="k">axis tilt</span><span class="v na" id="vTilt">—</span></div>
+   <div class="row"><span class="k">tip → bolus</span><span class="v na" id="vTB">—</span></div>
+   <div class="row"><span class="k">bolus ventral of tip</span><span class="v na" id="vBBT">—</span></div>
+   <div class="row"><span class="k">bolus ML from midline</span><span class="v na" id="vBML">—</span></div>
    <div class="row" id="rowOrient" hidden><span class="k">orientation</span><span class="v warn" id="vOrient">—</span></div>
   </div>
 
@@ -134,6 +142,8 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
     <div class="row"><span class="k">tissue vs atlas</span><span class="v na" id="dvRatio">—</span></div>
     <div class="row"><span class="k">DV from dura</span><span class="v na" id="dvDura">—</span></div>
     <div class="row"><span class="k">DV from bregma</span><span class="v na" id="dvBregma">—</span></div>
+    <div class="row"><span class="k">bolus DV from dura</span><span class="v na" id="dvBolDura">—</span></div>
+    <div class="row"><span class="k">bolus DV from bregma</span><span class="v na" id="dvBolBregma">—</span></div>
    </div>
    <label class="lbl" style="margin-top:7px"><input type="checkbox" id="shrink"> correct for shrinkage (scale by tissue/atlas span)</label>
    <p class="hint">Needs an atlas plate, plus tip and ventral marks. Put the ventral mark on the <b>lowest midline point</b> of the section — <b>Snap ventral</b> finds it for you. Shrinkage scaling needs the dorsal mark on the brain surface too.</p>
@@ -145,7 +155,7 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
    <textarea class="out" id="out" readonly aria-label="Results"></textarea>
    <div class="btnrow" style="margin-top:6px"><button class="act" id="copy">Copy table</button><button class="act" id="save">Save file</button></div></div>
 
-  <p class="hint"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> choose mark · <kbd>f</kbd> flip 180° · arrows nudge (<kbd>Shift</kbd>×10) · <kbd>[</kbd> <kbd>]</kbd> change image. Work is kept in this browser; <b>Save file</b> writes a .json you can reload later or send on.</p>
+  <p class="hint"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> choose mark · <kbd>f</kbd> flip 180° · arrows nudge (<kbd>Shift</kbd>×10) · <kbd>[</kbd> <kbd>]</kbd> change image. Work is kept in this browser; <b>Save file</b> writes a .json you can reload later or send on.</p>
  </aside>
 </div>
 <script>
@@ -173,7 +183,14 @@ function measure(m){
  const span=len*m.um;
  const tilt=Math.atan2(ux*fl,uy*fl)*180/Math.PI; // 0 = dorsal->ventral points down the screen
  const upsideDown=Math.abs(tilt)>90;             // dorsal mark sits below the ventral one on screen
- return {ml,dv,av:span-dv,span,tilt,upsideDown};
+ const R={ml,dv,av:span-dv,span,tilt,upsideDown};
+ if(m.bol){                                      // bolus centre, marked ventral of the tip
+  const wx=m.bol.x-m.dor.x, wy=m.bol.y-m.dor.y;
+  R.bdv=(wx*ux+wy*uy)*m.um; R.bml=(wx*uy-wy*ux)*m.um; R.bav=span-R.bdv;
+  R.tipBol=Math.hypot(m.bol.x-m.tip.x,m.bol.y-m.tip.y)*m.um;   // straight-line tip to bolus
+  R.bolBelowTip=R.bdv-dv;                                      // along the axis, + = ventral of the tip
+ }
+ return R;
 }
 window.__measure=measure;
 // Stereotaxic estimate: anchor on the ventral midline surface, which is crisp in every section.
@@ -225,11 +242,17 @@ function render(){
  }
  if(S.cal&&S.cal.a&&S.cal.b) g+=`<line x1="${S.cal.a.x}" y1="${S.cal.a.y}" x2="${S.cal.b.x}" y2="${S.cal.b.y}" stroke="#5CFF8A" stroke-width="${lw}"/>`;
  const mk=(p,col)=>p?`<circle cx="${p.x}" cy="${p.y}" r="${lw*5}" fill="none" stroke="#000" stroke-width="${lw*2.6}"/><circle cx="${p.x}" cy="${p.y}" r="${lw*5}" fill="none" stroke="${col}" stroke-width="${lw*1.5}"/>`:'';
- g+=mk(c.dor,'#6FD3FF')+mk(c.ven,'#6FD3FF')+mk(c.tip,'#FFC63D');
+ if(c.tip&&c.bol) g+=`<line x1="${c.tip.x}" y1="${c.tip.y}" x2="${c.bol.x}" y2="${c.bol.y}" stroke="#5CFF8A" stroke-width="${lw}" stroke-dasharray="${lw*3} ${lw*3}"/>`;
+ g+=mk(c.dor,'#6FD3FF')+mk(c.ven,'#6FD3FF')+mk(c.bol,'#5CFF8A')+mk(c.tip,'#FFC63D');
  el.ov.innerHTML=g;
  // scale bar
- if(c.um){const mm=1000/c.um*k; $('sbar').style.width=mm+'px'; $('sbar').hidden=false; $('sbarTxt').textContent='1 mm';}
- else $('sbar').hidden=true;
+ if(c.um){ // pick a round length that lands near a fifth of the displayed width
+  const want=r.width*0.2/k*c.um, steps=[10,20,50,100,200,500,1000,2000,5000,10000];
+  const L=steps.reduce((a,b)=>Math.abs(b-want)<Math.abs(a-want)?b:a);
+  $('sbar').style.width=(L/c.um*k)+'px'; $('sbar').hidden=false;
+  $('sbarTxt').textContent=L>=1000?(L/1000)+' mm':L+' µm';
+  $('sbarUm').textContent=c.um+' µm/px';
+ } else $('sbar').hidden=true;
  const M=measure(c), set=(id,v,warn)=>{const e=$(id);e.textContent=v==null?'—':v;e.classList.toggle('na',v==null);e.classList.toggle('warn',!!warn);};
  const sgn=v=>(v>=0?'+':'−')+Math.round(Math.abs(v));
  set('vML',M.ml!=null?sgn(M.ml)+' µm':null);
@@ -244,24 +267,34 @@ function render(){
  set('dvRatio',E.ratio!=null?E.ratio.toFixed(2)+'×':null, E.ratio!=null&&(E.ratio<0.8||E.ratio>1.1));
  set('dvDura',E.dura!=null?E.dura.toFixed(2)+' mm':null);
  set('dvBregma',E.bregma!=null?E.bregma.toFixed(2)+' mm':null);
+ set('vTB',M.tipBol!=null?Math.round(M.tipBol)+' µm':null);
+ set('vBBT',M.bolBelowTip!=null?sgn(M.bolBelowTip)+' µm':null, M.bolBelowTip!=null&&M.bolBelowTip<0);
+ set('vBML',M.bml!=null?sgn(M.bml)+' µm':null);
+ const Eb=M.bav!=null&&plate?dvEstimate({av:M.bav,span:M.span},plate,$('shrink').checked):{};
+ set('dvBolDura',Eb.dura!=null?Eb.dura.toFixed(2)+' mm':null);
+ set('dvBolBregma',Eb.bregma!=null?Eb.bregma.toFixed(2)+' mm':null);
  const ro=$('rowOrient'); ro.hidden=!M.upsideDown;
  if(M.upsideDown) $('vOrient').textContent='dorsal is below ventral';
  output(); save();
 }
 function output(){
- const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px','flipped','dv_from_dura_mm','dv_from_bregma_mm','shrinkage_applied','tissue_atlas_ratio','atlas_vent_below_bregma_mm'];
+ const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px','flipped','dv_from_dura_mm','dv_from_bregma_mm','shrinkage_applied','tissue_atlas_ratio','atlas_vent_below_bregma_mm','bolus_ml_um','bolus_above_ventral_um','tip_to_bolus_um','bolus_ventral_of_tip_um','bolus_dv_from_dura_mm','bolus_dv_from_bregma_mm'];
  const rows=[head.join('\t')]; let n=0;
  for(const c of S.imgs){const M=measure(c); if(M.ml==null) continue; n++;
   rows.push([c.label||'',c.name,(c.ap??''),(c.apPlate??''),Math.round(M.ml),Math.round(M.dv),Math.round(M.av),Math.round(M.span),M.tilt.toFixed(1),c.um,c.flip?'Y':'',
    ...(()=>{const p=c.apPlate!=null?ATLAS.find(z=>z.i===c.apPlate):null,E=dvEstimate(M,p,$('shrink').checked);
     return [E.dura!=null?E.dura.toFixed(2):'',E.bregma!=null?E.bregma.toFixed(2):'',
-            $('shrink').checked?'Y':'',E.ratio!=null?E.ratio.toFixed(3):'',p?p.v:''];})()].join('\t'));}
+            $('shrink').checked?'Y':'',E.ratio!=null?E.ratio.toFixed(3):'',p?p.v:'',
+            M.bml!=null?Math.round(M.bml):'',M.bav!=null?Math.round(M.bav):'',
+            M.tipBol!=null?Math.round(M.tipBol):'',M.bolBelowTip!=null?Math.round(M.bolBelowTip):'',
+            ...(()=>{const Eb=(M.bav!=null&&p)?dvEstimate({av:M.bav,span:M.span},p,$('shrink').checked):{};
+              return [Eb.dura!=null?Eb.dura.toFixed(2):'',Eb.bregma!=null?Eb.bregma.toFixed(2):''];})()];})()].join('\t'));}
  $('nDone').textContent=n;
  $('out').value=n?rows.join('\n'):'no completed measurements yet';
 }
 // ---- marking ----
-function setActive(w){S.active=w;[['tip','bTip'],['dor','bDor'],['ven','bVen']].forEach(([k,id])=>$(id).setAttribute('aria-pressed',String(k===w)));}
-$('bTip').onclick=()=>setActive('tip');$('bDor').onclick=()=>setActive('dor');$('bVen').onclick=()=>setActive('ven');
+function setActive(w){S.active=w;[['tip','bTip'],['dor','bDor'],['ven','bVen'],['bol','bBol']].forEach(([k,id])=>$(id).setAttribute('aria-pressed',String(k===w)));}
+$('bTip').onclick=()=>setActive('tip');$('bDor').onclick=()=>setActive('dor');$('bVen').onclick=()=>setActive('ven');$('bBol').onclick=()=>setActive('bol');
 $('bCal').onclick=()=>{S.cal=S.cal?null:{a:null,b:null};$('bCal').setAttribute('aria-pressed',String(!!S.cal));
  $('calHint').textContent=S.cal?'Click the two ends of the known length, then type it in the box above.':'Type µm/px if you know it, or click two points a known distance apart.';render();};
 el.frame.addEventListener('click',e=>{
@@ -285,7 +318,7 @@ function drawMag(p){const c=cur(); if(!c||!el.im.naturalWidth)return;
 el.frame.addEventListener('mousemove',e=>drawMag(natural(e)));
 addEventListener('keydown',e=>{
  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
- if(e.key==='1')return setActive('tip'); if(e.key==='2')return setActive('dor'); if(e.key==='3')return setActive('ven');
+ if(e.key==='1')return setActive('tip'); if(e.key==='2')return setActive('dor'); if(e.key==='3')return setActive('ven'); if(e.key==='4')return setActive('bol');
  if(e.key==='f')return $('bFlip').click();
  if(e.key===']'&&S.cur<S.imgs.length-1)return show(S.cur+1);
  if(e.key==='['&&S.cur>0)return show(S.cur-1);
@@ -327,7 +360,7 @@ $('bSnap').onclick=()=>{const c=cur(); if(!c||!c.dor||!c.ven){alert('Place the d
  c.ven=last; render(); save();
  $('bSnap').textContent=(c.um?('moved '+Math.round(moved)+' µm'):'snapped'); setTimeout(()=>$('bSnap').textContent='Snap ventral to surface',1800);};
 $('bSwap').onclick=()=>{const c=cur();if(!c||!c.dor||!c.ven)return;const d=c.dor;c.dor=c.ven;c.ven=d;render();save();};
-$('bClear').onclick=()=>{const c=cur();if(!c)return;delete c.tip;delete c.dor;delete c.ven;setActive('tip');render();};
+$('bClear').onclick=()=>{const c=cur();if(!c)return;delete c.tip;delete c.dor;delete c.ven;delete c.bol;setActive('tip');render();};
 $('bDel').onclick=()=>{if(S.cur<0)return;S.imgs.splice(S.cur,1);S.cur=Math.min(S.cur,S.imgs.length-1);
  if(!S.imgs.length){el.frame.hidden=true;$('empty').hidden=false;$('out').value='';}else show(S.cur);renderList();save();};
 // ---- files ----

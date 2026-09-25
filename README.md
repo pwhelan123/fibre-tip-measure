@@ -7,7 +7,7 @@ images are read in the browser and stay on that computer.
 1. Drop section images in (or "Choose files…"). Any image your browser opens: TIFF exports, PNG, JPEG, screenshots.
 2. Set the scale for each image: type **µm per pixel**, or click **Calibrate by clicking 2 points**, type the known
    length in µm, and click the two ends of it (a scale bar, or a structure you have measured).
-3. Place three marks: **1 fibre tip**, **2 dorsal**, **3 ventral**. Put the dorsal and ventral marks on the midline —
+3. Place the marks: **1 fibre tip**, **2 dorsal**, **3 ventral**, and optionally **4 bolus** (the centre of the injection bolus, ventral of the tip). Put the dorsal and ventral marks on the midline —
    at the brain surface if you want depth from the surface.
 4. Optionally type the animal ID and the AP level (mm from bregma) you matched the section to.
 5. **Copy table** (tab separated, pastes into Excel/Prism) or **Save file** (.json, reloadable with "Load saved").
@@ -86,3 +86,20 @@ plate is wrong. Correction needs the dorsal mark on the dorsal surface; without 
 **Limits.** The CCF has no bregma; its position here is the standard landmark convention, and CCF axes are tilted
 a few degrees from the skull-flat frame. Treat these as estimates good to a few hundred microns, and say in a paper
 that DV was estimated from atlas-matched sections rather than measured in vivo.
+
+## Bolus mark (4)
+
+Optional fourth mark for the centre of the injection bolus. It is measured in the same frame as the tip, so you get:
+
+- `tip_to_bolus_um` — straight-line distance from tip to bolus
+- `bolus_ventral_of_tip_um` — the component along your dorsal→ventral axis. Positive is ventral of the tip;
+  negative (bolus dorsal of the tip) is shown in orange, since the usual case is a bolus below the fibre
+- `bolus_ml_um`, `bolus_above_ventral_um` — its own position, same conventions as the tip
+- `bolus_dv_from_dura_mm`, `bolus_dv_from_bregma_mm` — its own stereotaxic DV estimate
+
+## Scale bar
+
+The bar picks a round length near a fifth of the image width (10 µm up to 10 mm) and prints the µm/px underneath.
+Its length is computed from the µm/px for that image, so **if the bar looks wrong, the scale is wrong** — the usual
+cause is entering a µm/px from the full-resolution slide while working on a downscaled export. Check it against
+something you know, or set the scale with **Calibrate by clicking 2 points**.
