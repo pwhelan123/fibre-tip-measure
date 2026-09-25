@@ -78,7 +78,7 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
    <h2>Measure a fibre tip against the midline</h2>
    <ol>
     <li>Drop in your section images (any format your browser opens).</li>
-    <li>Set the scale — read it from the original TIFF, type µm per pixel, or click two points a known distance apart.</li>
+    <li>Set the scale — type µm per pixel, or click two points a known distance apart.</li>
     <li>Place three marks: the <b style="color:var(--tip)">fibre tip</b>, then a <b style="color:var(--axis)">dorsal</b> and a <b style="color:var(--axis)">ventral</b> point on the midline.</li>
     <li>Type the AP level you matched the section to, if you have it.</li>
    </ol>
@@ -112,8 +112,6 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
     <div><label class="lbl" for="calLen">Known length (µm)</label><input type="number" id="calLen" step="1" placeholder="1000"></div>
    </div>
    <div class="btnrow" style="margin-top:6px"><button class="ghost" id="bCal" aria-pressed="false">Calibrate by clicking 2 points</button></div>
-   <div class="btnrow" style="margin-top:6px"><button class="ghost" id="bTiff">Read scale from TIFF…</button>
-    <input type="file" id="tiffFile" accept=".tif,.tiff,image/tiff" hidden></div>
    <p class="hint" id="tiffHint"></p>
    <p class="hint" id="calHint">Type µm/px if you know it, or click two points a known distance apart (a scale bar, or a structure you have measured).</p></div>
 
@@ -196,52 +194,7 @@ function measure(m){
  return R;
 }
 
-// ---- read pixel size out of a TIFF header (no decoding, just the tags) ----
-// Handles classic TIFF (LE/BE): XResolution + ResolutionUnit, ImageJ "unit=/spacing="
-// descriptions, and OME-XML PhysicalSizeX. BigTIFF is detected and reported, not parsed.
-function tiffScale(buf){
- const d=new DataView(buf); if(d.byteLength<8) return {err:'file too short'};
- const b0=d.getUint16(0,true);
- let le; if(b0===0x4949)le=true; else if(b0===0x4d4d)le=false; else return {err:'not a TIFF'};
- const magic=d.getUint16(2,le);
- if(magic===43) return {err:'BigTIFF is not supported — export a normal TIFF or type the scale'};
- if(magic!==42) return {err:'not a TIFF'};
- let off=d.getUint32(4,le);
- if(off<=0||off>=d.byteLength) return {err:'bad TIFF header'};
- const n=d.getUint16(off,le); const tags={};
- const SIZE={1:1,2:1,3:2,4:4,5:8,6:1,7:1,8:2,9:4,10:8,11:4,12:8};
- for(let i=0;i<n;i++){
-  const e=off+2+i*12, tag=d.getUint16(e,le), type=d.getUint16(e+2,le), count=d.getUint32(e+4,le);
-  const len=(SIZE[type]||1)*count; let p=e+8;
-  if(len>4){p=d.getUint32(e+8,le); if(p+len>d.byteLength) continue;}
-  const read=()=>{
-   if(type===3) return d.getUint16(p,le);
-   if(type===4) return d.getUint32(p,le);
-   if(type===5) return d.getUint32(p,le)/(d.getUint32(p+4,le)||1);
-   if(type===2){let s='';for(let k=0;k<count;k++){const ch=d.getUint8(p+k);if(!ch)break;s+=String.fromCharCode(ch);}return s;}
-   return null;};
-  tags[tag]=read();
- }
- const w=tags[256], h=tags[257], desc=tags[270]||'', unit=tags[296], xres=tags[282];
- let um=null, src=null;
- const ome=/PhysicalSizeX="([\d.eE+-]+)"/.exec(desc);
- if(ome){ um=parseFloat(ome[1]);
-  const u=/PhysicalSizeXUnit="([^"]+)"/.exec(desc);
-  if(u){ const k={'nm':0.001,'µm':1,'um':1,'micron':1,'mm':1000,'cm':10000,'m':1e6}[u[1]]; if(k) um*=k; }
-  src='OME-XML PhysicalSizeX'; }
- if(um==null && /ImageJ=/.test(desc) && xres){
-  const u=(/unit=([^\n\r]+)/.exec(desc)||[])[1];
-  const k={'micron':1,'um':1,'µm':1,'microns':1,'nm':0.001,'mm':1000,'cm':10000,'inch':25400,'pixel':null}[(u||'').trim()];
-  if(k){ um=k/xres; src='ImageJ header ('+u.trim()+')'; }
- }
- if(um==null && xres && unit){
-  if(unit===3){ um=10000/xres; src='XResolution (cm)'; }
-  else if(unit===2){ um=25400/xres; src='XResolution (inch)'; }
- }
- if(um==null) return {w,h,err:'no pixel size in this TIFF'+(xres?' (has XResolution but no usable unit)':'')};
- return {um:+um.toPrecision(6), w, h, src};
-}
-window.__tiffScale=tiffScale;
+
 
 window.__measure=measure;
 // Stereotaxic estimate: anchor on the ventral midline surface, which is crisp in every section.
@@ -330,7 +283,7 @@ function render(){
  output(); save();
 }
 function output(){
- const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px','flipped','dv_from_dura_mm','dv_from_bregma_mm','shrinkage_applied','tissue_atlas_ratio','atlas_vent_below_bregma_mm','bolus_ml_um','bolus_above_ventral_um','tip_to_bolus_um','bolus_ventral_of_tip_um','bolus_dv_from_dura_mm','bolus_dv_from_bregma_mm','tiff_um_per_px','tiff_width_px'];
+ const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px','flipped','dv_from_dura_mm','dv_from_bregma_mm','shrinkage_applied','tissue_atlas_ratio','atlas_vent_below_bregma_mm','bolus_ml_um','bolus_above_ventral_um','tip_to_bolus_um','bolus_ventral_of_tip_um','bolus_dv_from_dura_mm','bolus_dv_from_bregma_mm'];
  const rows=[head.join('\t')]; let n=0;
  for(const c of S.imgs){const M=measure(c); if(M.ml==null) continue; n++;
   rows.push([c.label||'',c.name,(c.ap??''),(c.apPlate??''),Math.round(M.ml),Math.round(M.dv),Math.round(M.av),Math.round(M.span),M.tilt.toFixed(1),c.um,c.flip?'Y':'',
@@ -340,7 +293,7 @@ function output(){
             M.bml!=null?Math.round(M.bml):'',M.bav!=null?Math.round(M.bav):'',
             M.tipBol!=null?Math.round(M.tipBol):'',M.bolBelowTip!=null?Math.round(M.bolBelowTip):'',
             ...(()=>{const Eb=(M.bav!=null&&p)?dvEstimate({av:M.bav,span:M.span},p,$('shrink').checked):{};
-              return [Eb.dura!=null?Eb.dura.toFixed(2):'',Eb.bregma!=null?Eb.bregma.toFixed(2):''];})(),c.tiffUm??'',c.tiffW??''];})()].join('\t'));}
+              return [Eb.dura!=null?Eb.dura.toFixed(2):'',Eb.bregma!=null?Eb.bregma.toFixed(2):''];})()];})()].join('\t'));}
  $('nDone').textContent=n;
  $('out').value=n?rows.join('\n'):'no completed measurements yet';
 }
@@ -420,42 +373,16 @@ function addFiles(files){
  const all=[...files];
  const tiffs=all.filter(isTiff);
  const pics=all.filter(f=>f.type.startsWith('image/')&&!isTiff(f));
- if(tiffs.length&&!pics.length&&!S.imgs.length){
-  note('Browsers cannot display TIFF images. Drop the PNG or JPEG export you want to measure on, then drop the TIFF again and its scale will be read from the metadata.',true);
-  return;}
+ if(tiffs.length) note('Browsers cannot display TIFF — measure on a PNG or JPEG export of it, and set the scale below.',true);
+ if(!pics.length) return;
  const jobs=pics.map(f=>new Promise(res=>{
   const r=new FileReader(); r.onload=()=>res({name:f.name,label:f.name.replace(/\.[^.]+$/,''),src:r.result,um:null,ap:null}); r.readAsDataURL(f);}));
  Promise.all(jobs).then(list=>{
   if(list.length){S.imgs=S.imgs.concat(list); show(S.imgs.length-list.length); renderList(); save();}
-  if(tiffs.length){
-   note(tiffs.length===1?'Reading scale from '+tiffs[0].name+'…':'Reading scale from '+tiffs.length+' TIFFs…');
-   setTimeout(()=>tiffs.forEach(applyTiff),200);}
  });
 }
 const isTiff=f=>/\.tiff?$/i.test(f.name)||f.type==='image/tiff';
 function note(html,warn){$('tiffHint').innerHTML=warn?('<b style="color:var(--warn)">'+html+'</b>'):html;}
-// Browsers cannot display TIFFs, so a TIFF is only ever used for its pixel size:
-// it is matched to an already-loaded export (same file name if possible) and the
-// scale is adjusted by the ratio of their pixel widths.
-function applyTiff(f){
- const base=f.name.replace(/\.[^.]+$/,'').toLowerCase();
- let i=S.imgs.findIndex(c=>c.name.replace(/\.[^.]+$/,'').toLowerCase()===base);
- if(i<0) i=S.cur;
- if(i<0){note('Add the PNG or JPEG export you want to measure on first, then read its TIFF for the scale.',true);return;}
- if(i!==S.cur) show(i);
- const c=S.imgs[i], r=new FileReader();
- r.onload=()=>{const t=tiffScale(r.result);
-  if(t.err){note(t.err+(t.w?(' — TIFF is '+t.w+'×'+t.h+' px'):''),true);return;}
-  const shown=el.im.naturalWidth, ratio=t.w?t.w/shown:1;
-  c.um=+(t.um*ratio).toPrecision(6); c.tiffUm=t.um; c.tiffW=t.w; $('umpx').value=c.um;
-  const same=Math.abs(ratio-1)<0.001;
-  note(`<b>${c.um} µm/px</b> for <b>${c.label||c.name}</b> — ${t.um} µm/px from ${t.src}` + (same
-    ? ', image is full resolution.'
-    : `, TIFF ${t.w} px wide vs this image ${shown} px (×${ratio.toFixed(3)}).`));
-  render(); save();};
- r.readAsArrayBuffer(f);}
-$('bTiff').onclick=()=>{if(!S.imgs.length){note('Add the PNG or JPEG export you want to measure on first.',true);return;}$('tiffFile').click();};
-$('tiffFile').onchange=e=>{const f=e.target.files[0]; if(f)applyTiff(f); e.target.value='';};
 $('pick').onclick=()=>$('file').click();
 $('file').onchange=e=>addFiles(e.target.files);
 const dz=$('drop');
