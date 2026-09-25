@@ -58,3 +58,31 @@ template. Plates are built into the file — no download, works offline.
 **The bregma values are approximate.** The CCF has no bregma; the conversion is a linear fit
 (`bregma = -1.024 × AP_mm + 5.428`) and drifts near the poles, where the skull landmark and the atlas
 diverge most. Treat it as ~0.1–0.2 mm, not exact, and say in a paper that AP came from atlas plate matching.
+
+## Stereotaxic DV estimate
+
+With an atlas plate chosen and the tip and ventral marks placed, the panel estimates how deep the tip sits:
+
+    DV below bregma = (atlas depth from bregma to the midline ventral surface at that AP) - (tip height above your ventral mark)
+    DV below dura   = (atlas dorsal-to-ventral midline distance at that AP)               - (tip height above your ventral mark)
+
+The ventral midline surface is the anchor because it is crisp in every section and survives trimming and damage,
+unlike the dorsal surface. The atlas depth is also flat along AP in the brainstem (7.0-7.1 mm from bregma between
+-5.8 and -7.1), so a plate chosen 0.2 mm out barely moves the answer.
+
+Both references are always written to the results (`dv_from_dura_mm`, `dv_from_bregma_mm`) — report whichever
+matches how the implant was set.
+
+**Snap ventral to surface** walks down your dorsal->ventral axis and puts the ventral mark on the last tissue
+pixel, so the anchor does not depend on how carefully someone clicked. It handles fluorescence and brightfield
+(it reads the corners to decide which way round tissue and background are) and tells you how far it moved the mark.
+
+**Shrinkage correction** (checkbox) scales measured distances by `tissue span / atlas span`, taken from your two
+midline marks against the atlas midline at the same plate. Processed tissue usually comes out 5-15% smaller, which
+makes an uncorrected tip read too deep. The ratio is always shown and written out (`tissue_atlas_ratio`), and is
+flagged if it falls outside 0.8-1.1 - which usually means the dorsal mark is not on the brain surface, or the
+plate is wrong. Correction needs the dorsal mark on the dorsal surface; without that, leave it off.
+
+**Limits.** The CCF has no bregma; its position here is the standard landmark convention, and CCF axes are tilted
+a few degrees from the skull-flat frame. Treat these as estimates good to a few hundred microns, and say in a paper
+that DV was estimated from atlas-matched sections rather than measured in vivo.
