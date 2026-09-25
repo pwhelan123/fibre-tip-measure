@@ -12,6 +12,13 @@ images are read in the browser and stay on that computer.
 4. Optionally type the animal ID and the AP level (mm from bregma) you matched the section to.
 5. **Copy table** (tab separated, pastes into Excel/Prism) or **Save file** (.json, reloadable with "Load saved").
 
+**Dorsal up, ventral down.** Work with the section the right way up: if it is upside down, hit **Flip 180°**
+first. Measurements are defined by your two midline marks, so the tool reads correctly either way, but the
+orientation matters for two things it tells you — `axis_tilt_deg` is reported relative to the view you are
+working in (a flipped upside-down section reads ~0°, not 180°), and the panel warns **dorsal is below ventral**
+if the two marks end up the wrong way round. **Swap D↔V** exchanges them; note this reverses the axis, so the
+ML sign flips with it — which is the point, as the sign is defined relative to the dorsal→ventral direction.
+
 **Flip 180°** rotates the view for sections mounted the other way up (or scanned upside down), so you can work
 with dorsal at the top. It only changes what you see: marks are stored against the image itself, so flipping
 before or after marking gives the same measurements, and you can toggle it freely. The results record it in a

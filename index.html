@@ -114,7 +114,7 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
    <button id="bTip" aria-pressed="true">1 · Tip</button>
    <button id="bDor" aria-pressed="false">2 · Dorsal</button>
    <button id="bVen" aria-pressed="false">3 · Ventral</button></div>
-   <p class="hint" style="margin-top:6px">Put the dorsal and ventral marks on the midline — at the brain surface if you want depth from the surface.</p></div>
+   <p class="hint" style="margin-top:6px">Put the dorsal and ventral marks on the midline — at the brain surface if you want depth from the surface. If the section is upside down, <b>Flip 180°</b> first so dorsal is at the top; the panel warns if the dorsal mark ends up below the ventral one.</p></div>
 
   <canvas class="mag" id="mag" width="280" height="280"></canvas>
 
@@ -124,9 +124,10 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
    <div class="row"><span class="k">above ventral mark</span><span class="v na" id="vAV">—</span></div>
    <div class="row"><span class="k">dorsal–ventral span</span><span class="v na" id="vSpan">—</span></div>
    <div class="row"><span class="k">axis tilt</span><span class="v na" id="vTilt">—</span></div>
+   <div class="row" id="rowOrient" hidden><span class="k">orientation</span><span class="v warn" id="vOrient">—</span></div>
   </div>
 
-  <div class="btnrow"><button class="ghost" id="bFlip">⟲ Flip 180°</button><button class="ghost" id="bClear">Clear marks</button><button class="ghost" id="bDel">Remove image</button></div>
+  <div class="btnrow"><button class="ghost" id="bFlip">⟲ Flip 180°</button><button class="ghost" id="bSwap">Swap D↔V</button><button class="ghost" id="bClear">Clear marks</button><button class="ghost" id="bDel">Remove image</button></div>
 
   <div><p class="eyebrow">Results (<span id="nDone">0</span> measured)</p>
    <textarea class="out" id="out" readonly aria-label="Results"></textarea>
@@ -150,6 +151,7 @@ const cur=()=>S.imgs[S.cur];
 // ---- geometry (shared by UI and self-test) ----
 function measure(m){
  if(!m||!m.tip||!m.dor||!m.ven||!m.um) return {};
+ const fl=m.flip?-1:1;   // the view the user is working in
  const dx=m.ven.x-m.dor.x, dy=m.ven.y-m.dor.y, len=Math.hypot(dx,dy);
  if(len<3) return {};
  const ux=dx/len, uy=dy/len;                    // unit vector dorsal -> ventral
@@ -157,8 +159,9 @@ function measure(m){
  const dv=(vx*ux+vy*uy)*m.um;                   // along axis, from dorsal mark
  const ml=(vx*uy-vy*ux)*m.um;                   // perpendicular, + = right of the axis
  const span=len*m.um;
- const tilt=Math.atan2(ux,uy)*180/Math.PI;      // 0 = axis points straight down the image
- return {ml,dv,av:span-dv,span,tilt};
+ const tilt=Math.atan2(ux*fl,uy*fl)*180/Math.PI; // 0 = dorsal->ventral points down the screen
+ const upsideDown=Math.abs(tilt)>90;             // dorsal mark sits below the ventral one on screen
+ return {ml,dv,av:span-dv,span,tilt,upsideDown};
 }
 window.__measure=measure;
 
@@ -209,7 +212,9 @@ function render(){
  set('vDV',M.dv!=null?Math.round(M.dv)+' µm':null);
  set('vAV',M.av!=null?Math.round(M.av)+' µm':null);
  set('vSpan',M.span!=null?(M.span/1000).toFixed(2)+' mm':null);
- set('vTilt',M.tilt!=null?M.tilt.toFixed(1)+'°':null, M.tilt!=null&&Math.abs(M.tilt)>25);
+ set('vTilt',M.tilt!=null?M.tilt.toFixed(1)+'°':null, M.tilt!=null&&Math.abs(M.tilt)<=90&&Math.abs(M.tilt)>25);
+ const ro=$('rowOrient'); ro.hidden=!M.upsideDown;
+ if(M.upsideDown) $('vOrient').textContent='dorsal is below ventral';
  output(); save();
 }
 function output(){
@@ -259,6 +264,7 @@ $('label').oninput=e=>{const c=cur();if(c){c.label=e.target.value;renderList();o
 $('ap').oninput=e=>{const c=cur();if(c){c.ap=e.target.value===''?null:+e.target.value;output();save();}};
 $('umpx').oninput=e=>{const c=cur();if(c){c.um=e.target.value===''?null:+e.target.value;render();}};
 $('bFlip').onclick=()=>{const c=cur();if(!c)return;c.flip=!c.flip;render();save();};
+$('bSwap').onclick=()=>{const c=cur();if(!c||!c.dor||!c.ven)return;const d=c.dor;c.dor=c.ven;c.ven=d;render();save();};
 $('bClear').onclick=()=>{const c=cur();if(!c)return;delete c.tip;delete c.dor;delete c.ven;setActive('tip');render();};
 $('bDel').onclick=()=>{if(S.cur<0)return;S.imgs.splice(S.cur,1);S.cur=Math.min(S.cur,S.imgs.length-1);
  if(!S.imgs.length){el.frame.hidden=true;$('empty').hidden=false;$('out').value='';}else show(S.cur);renderList();save();};
