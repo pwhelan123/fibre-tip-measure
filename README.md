@@ -12,7 +12,12 @@ images are read in the browser and stay on that computer.
 4. Optionally type the animal ID and the AP level (mm from bregma) you matched the section to.
 5. **Copy table** (tab separated, pastes into Excel/Prism) or **Save file** (.json, reloadable with "Load saved").
 
-Keyboard: 1/2/3 choose mark, arrows nudge (Shift x10), [ and ] change image.
+**Flip 180°** rotates the view for sections mounted the other way up (or scanned upside down), so you can work
+with dorsal at the top. It only changes what you see: marks are stored against the image itself, so flipping
+before or after marking gives the same measurements, and you can toggle it freely. The results record it in a
+`flipped` column. Note a half-turn preserves left and right — it is not a mirror — so the ML sign stays correct.
+
+Keyboard: 1/2/3 choose mark, f flip 180°, arrows nudge (Shift x10), [ and ] change image.
 
 ## What it reports, per section
 - `ml_um` — distance from the midline, perpendicular to your dorsal→ventral axis. Signed: **+ is right of the axis

@@ -18,6 +18,8 @@ body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
 .atlasCap{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
 .atlasBig{font-family:var(--mono);font-size:20px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .frame{position:relative;line-height:0;cursor:crosshair;max-width:100%}
+.rot{position:relative;line-height:0;transform-origin:50% 50%}
+.rot.flip{transform:rotate(180deg)}
 .frame img{display:block;max-width:100%;max-height:calc(100vh - 40px);width:auto;height:auto}
 .frame svg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 .rail{background:var(--panel);border-left:1px solid var(--rule);padding:16px 14px 22px;display:flex;flex-direction:column;gap:13px;overflow-y:auto;max-height:100vh}
@@ -79,8 +81,7 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
    You get ML distance from the midline (signed), depth below the dorsal surface, and height above the ventral surface — measured along your own axis, so a tilted or rotated section still reads correctly.
   </div>
   <div class="frame" id="frame" hidden>
-   <img id="im" alt="section">
-   <svg id="ov"></svg>
+   <div class="rot" id="rot"><img id="im" alt="section"><svg id="ov"></svg></div>
    <div class="scalebar" id="sbar"><span id="sbarTxt">1 mm</span></div>
   </div>
   <div class="atlasPane" id="atlasPane" hidden>
@@ -125,13 +126,13 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
    <div class="row"><span class="k">axis tilt</span><span class="v na" id="vTilt">—</span></div>
   </div>
 
-  <div class="btnrow"><button class="ghost" id="bClear">Clear marks</button><button class="ghost" id="bDel">Remove image</button></div>
+  <div class="btnrow"><button class="ghost" id="bFlip">⟲ Flip 180°</button><button class="ghost" id="bClear">Clear marks</button><button class="ghost" id="bDel">Remove image</button></div>
 
   <div><p class="eyebrow">Results (<span id="nDone">0</span> measured)</p>
    <textarea class="out" id="out" readonly aria-label="Results"></textarea>
    <div class="btnrow" style="margin-top:6px"><button class="act" id="copy">Copy table</button><button class="act" id="save">Save file</button></div></div>
 
-  <p class="hint"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> choose mark · arrows nudge (<kbd>Shift</kbd>×10) · <kbd>[</kbd> <kbd>]</kbd> change image. Work is kept in this browser; <b>Save file</b> writes a .json you can reload later or send on.</p>
+  <p class="hint"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> choose mark · <kbd>f</kbd> flip 180° · arrows nudge (<kbd>Shift</kbd>×10) · <kbd>[</kbd> <kbd>]</kbd> change image. Work is kept in this browser; <b>Save file</b> writes a .json you can reload later or send on.</p>
  </aside>
 </div>
 <script>
@@ -179,9 +180,12 @@ function renderList(){
  $('list').querySelectorAll('.thumb').forEach(b=>b.onclick=()=>show(+b.dataset.i));
 }
 function natural(e){const r=el.im.getBoundingClientRect(),k=el.im.naturalWidth/r.width;
- return {x:(e.clientX-r.left)*k,y:(e.clientY-r.top)*k};}
+ let x=(e.clientX-r.left)*k, y=(e.clientY-r.top)*k;
+ const c=cur(); if(c&&c.flip){x=el.im.naturalWidth-x; y=el.im.naturalHeight-y;}
+ return {x,y};}
 function render(){
  const c=cur(); if(!c) return;
+ $('rot').classList.toggle('flip',!!c.flip);
  const r=el.im.getBoundingClientRect(), k=r.width/el.im.naturalWidth;
  el.ov.setAttribute('viewBox',`0 0 ${el.im.naturalWidth} ${el.im.naturalHeight}`);
  const lw=Math.max(1.5,el.im.naturalWidth/700);
@@ -209,10 +213,10 @@ function render(){
  output(); save();
 }
 function output(){
- const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px'];
+ const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px','flipped'];
  const rows=[head.join('\t')]; let n=0;
  for(const c of S.imgs){const M=measure(c); if(M.ml==null) continue; n++;
-  rows.push([c.label||'',c.name,(c.ap??''),(c.apPlate??''),Math.round(M.ml),Math.round(M.dv),Math.round(M.av),Math.round(M.span),M.tilt.toFixed(1),c.um].join('\t'));}
+  rows.push([c.label||'',c.name,(c.ap??''),(c.apPlate??''),Math.round(M.ml),Math.round(M.dv),Math.round(M.av),Math.round(M.span),M.tilt.toFixed(1),c.um,c.flip?'Y':''].join('\t'));}
  $('nDone').textContent=n;
  $('out').value=n?rows.join('\n'):'no completed measurements yet';
 }
@@ -234,23 +238,27 @@ el.frame.addEventListener('click',e=>{
 function drawMag(p){const c=cur(); if(!c||!el.im.naturalWidth)return;
  const Z=6,side=el.mag.width/Z; mc.fillStyle='#000';mc.fillRect(0,0,el.mag.width,el.mag.height);
  mc.imageSmoothingEnabled=false;
+ mc.save(); if(c.flip){mc.translate(el.mag.width,el.mag.height);mc.rotate(Math.PI);}
  try{mc.drawImage(el.im,p.x-side/2,p.y-side/2,side,side,0,0,el.mag.width,el.mag.height);}catch(_){}
+ mc.restore();
  mc.strokeStyle=S.active==='tip'?'#FFC63D':'#6FD3FF';mc.lineWidth=1;mc.beginPath();
  mc.moveTo(el.mag.width/2,0);mc.lineTo(el.mag.width/2,el.mag.height);mc.moveTo(0,el.mag.height/2);mc.lineTo(el.mag.width,el.mag.height/2);mc.stroke();}
 el.frame.addEventListener('mousemove',e=>drawMag(natural(e)));
 addEventListener('keydown',e=>{
  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
  if(e.key==='1')return setActive('tip'); if(e.key==='2')return setActive('dor'); if(e.key==='3')return setActive('ven');
+ if(e.key==='f')return $('bFlip').click();
  if(e.key===']'&&S.cur<S.imgs.length-1)return show(S.cur+1);
  if(e.key==='['&&S.cur>0)return show(S.cur-1);
  const c=cur(); if(!c)return; const p=c[S.active]; if(!p)return;
- const d=e.shiftKey?10:1; let u=true;
+ const d=(e.shiftKey?10:1)*(c.flip?-1:1); let u=true;
  if(e.key==='ArrowLeft')p.x-=d;else if(e.key==='ArrowRight')p.x+=d;else if(e.key==='ArrowUp')p.y-=d;else if(e.key==='ArrowDown')p.y+=d;else u=false;
  if(u){e.preventDefault();render();}});
 // ---- inputs ----
 $('label').oninput=e=>{const c=cur();if(c){c.label=e.target.value;renderList();output();save();}};
 $('ap').oninput=e=>{const c=cur();if(c){c.ap=e.target.value===''?null:+e.target.value;output();save();}};
 $('umpx').oninput=e=>{const c=cur();if(c){c.um=e.target.value===''?null:+e.target.value;render();}};
+$('bFlip').onclick=()=>{const c=cur();if(!c)return;c.flip=!c.flip;render();save();};
 $('bClear').onclick=()=>{const c=cur();if(!c)return;delete c.tip;delete c.dor;delete c.ven;setActive('tip');render();};
 $('bDel').onclick=()=>{if(S.cur<0)return;S.imgs.splice(S.cur,1);S.cur=Math.min(S.cur,S.imgs.length-1);
  if(!S.imgs.length){el.frame.hidden=true;$('empty').hidden=false;$('out').value='';}else show(S.cur);renderList();save();};
