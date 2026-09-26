@@ -111,8 +111,34 @@ kbd{font-family:var(--mono);font-size:10.5px;background:var(--panel2);border:1px
     <div><label class="lbl" for="umpx">µm per pixel</label><input type="number" id="umpx" step="0.001" placeholder="1.25"></div>
     <div><label class="lbl" for="calLen">Known length (µm)</label><input type="number" id="calLen" step="1" placeholder="1000"></div>
    </div>
-   <div class="btnrow" style="margin-top:6px"><button class="ghost" id="bCal" aria-pressed="false">Calibrate by clicking 2 points</button></div>
+   <div class="btnrow" style="margin-top:6px"><button class="ghost" id="bSrc">Set scale from source file…</button>
+    <button class="ghost" id="bCal" aria-pressed="false">Calibrate by clicking 2 points</button></div>
    <p class="hint" id="tiffHint"></p>
+   <div id="srcPanel" hidden style="margin-top:8px;border:1.5px solid var(--rule);border-radius:6px;padding:10px">
+    <label class="lbl" for="vendor">Where did this image come from?</label>
+    <select id="vendor" style="width:100%;background:var(--panel2);border:1.5px solid var(--rule);color:var(--ink);border-radius:5px;padding:7px 8px;font-family:var(--mono);font-size:12.5px">
+     <option value="lif">Leica .lif — read it from the file</option>
+     <option value="tif">TIFF / OME-TIFF — read it from the file</option>
+     <option value="vsi">Olympus .vsi / VS slide scanner</option>
+     <option value="nd2">Nikon .nd2</option>
+     <option value="czi">Zeiss .czi</option>
+     <option value="other">Other / I have the numbers</option>
+    </select>
+    <div id="srcFileWrap" style="margin-top:7px">
+     <button class="ghost" id="bSrcFile" style="width:100%">Choose the source file…</button>
+     <input type="file" id="srcFile" accept=".lif,.tif,.tiff" hidden>
+     <select id="srcSeries" hidden style="width:100%;margin-top:6px;background:var(--panel2);border:1.5px solid var(--rule);color:var(--ink);border-radius:5px;padding:6px;font-family:var(--mono);font-size:12px"></select>
+    </div>
+    <div id="srcManual" hidden style="margin-top:7px">
+     <p class="hint" id="vendorHelp" style="margin-bottom:6px"></p>
+     <div class="two">
+      <div><label class="lbl" for="srcUm">source µm/px</label><input type="number" id="srcUm" step="0.0001" placeholder="0.642"></div>
+      <div><label class="lbl" for="srcW">source width (px)</label><input type="number" id="srcW" step="1" placeholder="8000"></div>
+     </div>
+     <button class="act" id="bSrcApply" style="width:100%;margin-top:7px">Apply to this image</button>
+    </div>
+    <p class="hint" style="margin-top:7px">The scale must belong to <b>this</b> image. If you are measuring on an export that is smaller than the original, the µm/px is larger in proportion — a quarter-size export of a 0.642 µm/px slide is 2.568 µm/px. Give the original's width and the tool does that for you.</p>
+   </div>
    <p class="hint" id="calHint">Type µm/px if you know it, or click two points a known distance apart (a scale bar, or a structure you have measured).</p></div>
 
   <div><p class="eyebrow">Placing</p><div class="seg">
@@ -195,6 +221,77 @@ function measure(m){
 }
 
 
+
+
+// ---- pixel size from a source file (scale only; these are never displayed) ----
+// TIFF: OME-XML PhysicalSizeX, ImageJ unit/spacing, or XResolution in cm/inch.
+function tiffScale(buf){
+ const d=new DataView(buf); if(d.byteLength<8) return {err:'file too short'};
+ const b0=d.getUint16(0,true);
+ let le; if(b0===0x4949)le=true; else if(b0===0x4d4d)le=false; else return {err:'not a TIFF'};
+ const magic=d.getUint16(2,le);
+ if(magic===43) return {err:'BigTIFF is not supported — enter the scale below'};
+ if(magic!==42) return {err:'not a TIFF'};
+ let off=d.getUint32(4,le);
+ if(off<=0||off>=d.byteLength) return {err:'bad TIFF header'};
+ const n=d.getUint16(off,le); const tags={};
+ const SIZE={1:1,2:1,3:2,4:4,5:8,6:1,7:1,8:2,9:4,10:8,11:4,12:8};
+ for(let i=0;i<n;i++){
+  const e=off+2+i*12, tag=d.getUint16(e,le), type=d.getUint16(e+2,le), count=d.getUint32(e+4,le);
+  const len=(SIZE[type]||1)*count; let p=e+8;
+  if(len>4){p=d.getUint32(e+8,le); if(p+len>d.byteLength) continue;}
+  tags[tag]=(type===3)?d.getUint16(p,le):(type===4)?d.getUint32(p,le):
+   (type===5)?d.getUint32(p,le)/(d.getUint32(p+4,le)||1):
+   (type===2)?(()=>{let s='';for(let k=0;k<count;k++){const ch=d.getUint8(p+k);if(!ch)break;s+=String.fromCharCode(ch);}return s;})():null;
+ }
+ const w=tags[256],h=tags[257],desc=tags[270]||'',unit=tags[296],xres=tags[282];
+ let um=null,src=null;
+ const ome=/PhysicalSizeX="([\d.eE+-]+)"/.exec(desc);
+ if(ome){um=parseFloat(ome[1]);
+  const u=/PhysicalSizeXUnit="([^"]+)"/.exec(desc);
+  if(u){const k={'nm':0.001,'µm':1,'um':1,'micron':1,'mm':1000,'cm':10000,'m':1e6}[u[1]];if(k)um*=k;}
+  src='OME-XML';}
+ if(um==null&&/ImageJ=/.test(desc)&&xres){
+  const u=(/unit=([^\n\r]+)/.exec(desc)||[])[1];
+  const k={'micron':1,'um':1,'µm':1,'microns':1,'nm':0.001,'mm':1000,'cm':10000,'inch':25400}[(u||'').trim()];
+  if(k){um=k/xres;src='ImageJ header';}}
+ if(um==null&&xres&&unit){
+  if(unit===3){um=10000/xres;src='TIFF XResolution (cm)';}
+  else if(unit===2){um=25400/xres;src='TIFF XResolution (inch)';}}
+ if(um==null) return {w,h,err:'no pixel size stored in this TIFF'};
+ return {series:[{name:'TIFF',um:+um.toPrecision(6),w}],src};
+}
+// Leica LIF: 0x70 | u32 | 0x2A | u32 nchars | UTF-16LE XML. Pixel size = Length(m)/NumberOfElements for DimID 1.
+function lifScale(buf){
+ const d=new DataView(buf); if(d.byteLength<16) return {err:'file too short'};
+ if(d.getUint32(0,true)!==0x70||d.getUint8(8)!==0x2a) return {err:'not a Leica LIF'};
+ const n=d.getUint32(9,true), end=13+n*2;
+ if(end>d.byteLength) return {err:'LIF header is larger than the part read — enter the scale below'};
+ let xml='';
+ for(let p=13;p<end;p+=16384){
+  const len=Math.min(8192,(end-p)/2), a=new Uint16Array(len);
+  for(let k=0;k<len;k++)a[k]=d.getUint16(p+k*2,true);
+  xml+=String.fromCharCode.apply(null,a);
+ }
+ let doc; try{doc=new DOMParser().parseFromString(xml,'application/xml');}catch(_){return {err:'could not read the LIF header'};}
+ const out=[];
+ doc.querySelectorAll('Element').forEach(el=>{
+  const img=el.querySelector(':scope > Data > Image > ImageDescription'); if(!img) return;
+  const dx=[...img.querySelectorAll('Dimensions > DimensionDescription')].find(z=>z.getAttribute('DimID')==='1');
+  if(!dx) return;
+  const N=+dx.getAttribute('NumberOfElements'), L=parseFloat(dx.getAttribute('Length'));
+  if(!N||!isFinite(L)||L<=0) return;
+  out.push({name:el.getAttribute('Name')||'series',um:+(L*1e6/N).toPrecision(6),w:N});
+ });
+ if(!out.length) return {err:'no pixel size found in this LIF'};
+ return {series:out,src:'Leica LIF header'};
+}
+function sourceScale(name,buf){
+ if(/\.lif$/i.test(name)) return lifScale(buf);
+ if(/\.tiff?$/i.test(name)) return tiffScale(buf);
+ return {err:'no reader for this file type'};
+}
+window.__sourceScale=sourceScale;
 
 window.__measure=measure;
 // Stereotaxic estimate: anchor on the ventral midline surface, which is crisp in every section.
@@ -283,7 +380,7 @@ function render(){
  output(); save();
 }
 function output(){
- const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px','flipped','dv_from_dura_mm','dv_from_bregma_mm','shrinkage_applied','tissue_atlas_ratio','atlas_vent_below_bregma_mm','bolus_ml_um','bolus_above_ventral_um','tip_to_bolus_um','bolus_ventral_of_tip_um','bolus_dv_from_dura_mm','bolus_dv_from_bregma_mm'];
+ const head=['id','image','ap_mm','ap_plate_idx','ml_um','dv_below_dorsal_um','above_ventral_um','dorsoventral_span_um','axis_tilt_deg','um_per_px','flipped','dv_from_dura_mm','dv_from_bregma_mm','shrinkage_applied','tissue_atlas_ratio','atlas_vent_below_bregma_mm','bolus_ml_um','bolus_above_ventral_um','tip_to_bolus_um','bolus_ventral_of_tip_um','bolus_dv_from_dura_mm','bolus_dv_from_bregma_mm','scale_source','source_um_per_px','source_width_px'];
  const rows=[head.join('\t')]; let n=0;
  for(const c of S.imgs){const M=measure(c); if(M.ml==null) continue; n++;
   rows.push([c.label||'',c.name,(c.ap??''),(c.apPlate??''),Math.round(M.ml),Math.round(M.dv),Math.round(M.av),Math.round(M.span),M.tilt.toFixed(1),c.um,c.flip?'Y':'',
@@ -293,7 +390,8 @@ function output(){
             M.bml!=null?Math.round(M.bml):'',M.bav!=null?Math.round(M.bav):'',
             M.tipBol!=null?Math.round(M.tipBol):'',M.bolBelowTip!=null?Math.round(M.bolBelowTip):'',
             ...(()=>{const Eb=(M.bav!=null&&p)?dvEstimate({av:M.bav,span:M.span},p,$('shrink').checked):{};
-              return [Eb.dura!=null?Eb.dura.toFixed(2):'',Eb.bregma!=null?Eb.bregma.toFixed(2):''];})()];})()].join('\t'));}
+              return [Eb.dura!=null?Eb.dura.toFixed(2):'',Eb.bregma!=null?Eb.bregma.toFixed(2):''];})(),
+            c.scaleSrc||'not recorded',c.srcUm??'',c.srcW??''];})()].join('\t'));}
  $('nDone').textContent=n;
  $('out').value=n?rows.join('\n'):'no completed measurements yet';
 }
@@ -305,7 +403,7 @@ $('bCal').onclick=()=>{S.cal=S.cal?null:{a:null,b:null};$('bCal').setAttribute('
 el.frame.addEventListener('click',e=>{
  const c=cur(); if(!c) return; const p=natural(e);
  if(S.cal){ if(!S.cal.a||S.cal.b){S.cal={a:p,b:null};} else {S.cal.b=p; const len=+$('calLen').value;
-   if(len>0){ c.um=+(len/Math.hypot(S.cal.b.x-S.cal.a.x,S.cal.b.y-S.cal.a.y)).toFixed(4); $('umpx').value=c.um; }
+   if(len>0){ c.um=+(len/Math.hypot(S.cal.b.x-S.cal.a.x,S.cal.b.y-S.cal.a.y)).toFixed(4); c.scaleSrc='two-point calibration'; $('umpx').value=c.um; }
    else $('calHint').textContent='Type the known length in µm, then click the two points again.'; }
   render(); return; }
  c[S.active]={x:+p.x.toFixed(1),y:+p.y.toFixed(1)};
@@ -334,7 +432,7 @@ addEventListener('keydown',e=>{
 // ---- inputs ----
 $('label').oninput=e=>{const c=cur();if(c){c.label=e.target.value;renderList();output();save();}};
 $('ap').oninput=e=>{const c=cur();if(c){c.ap=e.target.value===''?null:+e.target.value;output();save();}};
-$('umpx').oninput=e=>{const c=cur();if(c){c.um=e.target.value===''?null:+e.target.value;render();}};
+$('umpx').oninput=e=>{const c=cur();if(c){c.um=e.target.value===''?null:+e.target.value;c.scaleSrc='typed by hand';render();}};
 $('bFlip').onclick=()=>{const c=cur();if(!c)return;c.flip=!c.flip;render();save();};
 $('shrink').onchange=()=>{try{localStorage.setItem('ftm.shrink',$('shrink').checked?'1':'0')}catch(_){} render();};
 try{$('shrink').checked=localStorage.getItem('ftm.shrink')==='1'}catch(_){}
@@ -382,6 +480,49 @@ function addFiles(files){
  });
 }
 const isTiff=f=>/\.tiff?$/i.test(f.name)||f.type==='image/tiff';
+const VHELP={vsi:'Olympus VS/.vsi: open it in Fiji (Bio-Formats) and read Image ▸ Properties, or check the scan settings in VS-ASW. A 10x/0.4 VS110 scan is about 0.642 µm/px.',
+ nd2:'Nikon .nd2: NIS-Elements shows the calibration in the image properties, or open it in Fiji (Bio-Formats) and read Image ▸ Properties.',
+ czi:'Zeiss .czi: ZEN shows the scaling under image properties, or open it in Fiji (Bio-Formats) and read Image ▸ Properties.',
+ other:'Get µm/px from the acquisition software, then give the width in pixels of that original image.'};
+function applyScale(um,w,src){
+ const c=cur(); if(!c) return;
+ const shown=el.im.naturalWidth, ratio=w?w/shown:1;
+ c.um=+(um*ratio).toPrecision(6); c.srcUm=um; c.srcW=w||''; c.scaleSrc=src; $('umpx').value=c.um;
+ note(Math.abs(ratio-1)<0.001
+  ? `<b>${c.um} µm/px</b> from ${src}; this image is full resolution.`
+  : `<b>${c.um} µm/px</b> — ${um} µm/px from ${src}, original ${w} px wide vs this image ${shown} px (×${ratio.toFixed(3)}).`);
+ render(); save();
+}
+function vendorMode(){
+ const v=$('vendor').value, readable=(v==='lif'||v==='tif');
+ $('srcFileWrap').hidden=!readable; $('srcManual').hidden=readable;
+ if(!readable) $('vendorHelp').textContent=VHELP[v]||VHELP.other;
+ $('srcFile').setAttribute('accept', v==='lif'?'.lif':'.tif,.tiff');
+}
+$('vendor').onchange=vendorMode;
+$('bSrc').onclick=()=>{if(!S.imgs.length){note('Add the image you are measuring on first.',true);return;}
+ $('srcPanel').hidden=!$('srcPanel').hidden; vendorMode();};
+$('bSrcFile').onclick=()=>$('srcFile').click();
+$('srcFile').onchange=e=>{const f=e.target.files[0]; if(!f)return; e.target.value='';
+ note('Reading '+f.name+'…');
+ const slice=f.slice(0,Math.min(f.size,8*1024*1024));   // header only
+ const r=new FileReader();
+ r.onload=()=>{const res=sourceScale(f.name,r.result);
+  if(res.err){note(res.err,true);return;}
+  const uniq=[...new Map(res.series.map(s=>[s.um+'|'+s.w,s])).values()];
+  const sel=$('srcSeries');
+  if(uniq.length>1){
+   sel.hidden=false;
+   sel.innerHTML=uniq.map((s,i)=>`<option value="${i}">${s.um} µm/px · ${s.w} px · ${s.name}</option>`).join('');
+   sel.onchange=()=>{const s=uniq[+sel.value]; applyScale(s.um,s.w,res.src);};
+   const best=uniq.reduce((a,b)=>Math.abs(b.w-el.im.naturalWidth)<Math.abs(a.w-el.im.naturalWidth)?b:a);
+   sel.value=uniq.indexOf(best); applyScale(best.um,best.w,res.src);
+  } else { sel.hidden=true; applyScale(uniq[0].um,uniq[0].w,res.src); }
+ };
+ r.readAsArrayBuffer(slice);};
+$('bSrcApply').onclick=()=>{const um=+$('srcUm').value, w=+$('srcW').value;
+ if(!(um>0)){note('Enter the µm/px of the original.',true);return;}
+ applyScale(um,w>0?w:null,$('vendor').selectedOptions[0].textContent.split('—')[0].trim());};
 function note(html,warn){$('tiffHint').innerHTML=warn?('<b style="color:var(--warn)">'+html+'</b>'):html;}
 $('pick').onclick=()=>$('file').click();
 $('file').onchange=e=>addFiles(e.target.files);
