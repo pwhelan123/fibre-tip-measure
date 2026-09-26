@@ -5,10 +5,17 @@ images are read in the browser and stay on that computer.
 
 ## Use
 1. Drop section images in (or "Choose files…"). Any image your browser opens: TIFF exports, PNG, JPEG, screenshots.
-2. Set the scale for each image: type **µm per pixel**, or click **Calibrate by clicking 2 points**, type the
-   known length in µm, and click the two ends of it (a scale bar, or a structure you have measured).
-   Measure on a PNG or JPEG export — browsers cannot display TIFF, and dropping one just says so.
-   If the export is a downscaled copy of the slide, the scale must be the export's µm/px, not the slide's.
+2. Set the scale — **Set scale from source file…** and say where the image came from:
+   - **Leica .lif** or **TIFF / OME-TIFF** — pick the file and the pixel size is read from its header. A LIF with
+     several series shows a picker, defaulting to the one whose width is closest to your image.
+   - **Olympus .vsi, Nikon .nd2, Zeiss .czi** — no reader (their metadata is not accessible in a browser), so the
+     panel tells you where to find the pixel size in Fiji or the acquisition software, and you type it in with the
+     **width in pixels of that original**.
+   The scale is then corrected for the export automatically: a quarter-size export of a 0.642 µm/px slide becomes
+   2.568 µm/px, with the arithmetic shown. This is the mistake that makes a 1 mm scale bar look short.
+   **Calibrate by clicking 2 points** and typing µm/px by hand both still work.
+   Every path records `scale_source`, `source_um_per_px` and `source_width_px` in the results — a scale nobody
+   verified says `not recorded`.
 3. Place the marks: **1 fibre tip**, **2 dorsal**, **3 ventral**, and optionally **4 bolus** (the centre of the injection bolus, ventral of the tip). Put the dorsal and ventral marks on the midline —
    at the brain surface if you want depth from the surface.
 4. Optionally type the animal ID and the AP level (mm from bregma) you matched the section to.
